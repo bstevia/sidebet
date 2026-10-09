@@ -6,8 +6,9 @@ from .cards import ACE, HEARTS, KING, QUEEN, VALUE, Hands
 class SideBet:
     name = ""
 
-    def __init__(self, paytable):
+    def __init__(self, paytable, config):
         self.pt = paytable
+        self.cfg = config
 
     def evaluate(self, h: Hands):
         raise NotImplementedError
@@ -93,8 +94,22 @@ class Insurance(SideBet):
         return res, valid
 
 
-ALL_BETS = [PerfectPairs, TwentyOnePlusThree, LuckyLadies, RoyalMatch, Insurance]
+class DealerBust(SideBet):
+    name = "dealer_bust"
+
+    def evaluate(self, h):
+        total, ncards = h.dealer_hand(self.cfg.hits_soft17)
+        bust = total > 21
+        counts = sorted(self.pt)
+        n = np.minimum(ncards, counts[-1])  # the largest card count also covers longer hands
+        res = np.full(h.r1.shape, -1.0)
+        for c in counts:
+            res[bust & (n == c)] = self.pt[c]
+        return res, None
 
 
-def build_bets(paytables):
-    return [cls(paytables[cls.name]) for cls in ALL_BETS]
+ALL_BETS = [PerfectPairs, TwentyOnePlusThree, LuckyLadies, RoyalMatch, Insurance, DealerBust]
+
+
+def build_bets(paytables, config):
+    return [cls(paytables[cls.name], config) for cls in ALL_BETS]

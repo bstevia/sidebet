@@ -14,6 +14,7 @@ def parse_args(argv=None):
     ap.add_argument("--penetration", type=float, default=d.penetration, help="fraction of shoe dealt before reshuffle")
     ap.add_argument("--extra-cards", type=int, default=d.extra_cards, help="cards consumed per round beyond the first 4")
     ap.add_argument("--shuffle-every-round", action="store_true", help="fresh shoe each round (no count effects)")
+    ap.add_argument("--h17", dest="hits_soft17", action="store_true", help="dealer hits soft 17 (default: stands)")
     ap.add_argument("--seed", type=int, default=d.seed)
     ap.add_argument("--tc-cap", type=int, default=d.tc_cap, help="clamp true-count buckets to +/- this value")
     ap.add_argument("--min-bucket", type=int, default=d.min_bucket, help="min samples to show a true-count bucket")

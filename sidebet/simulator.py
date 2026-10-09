@@ -1,16 +1,18 @@
 import numpy as np
 
 from .bets import build_bets
-from .cards import HILO, Hands
+from .cards import DEALER_MAX_HITS, HILO, Hands
 from .paytables import PAYTABLES
 from .stats import Accumulator
+
+CARDS_DEALT = 4 + DEALER_MAX_HITS
 
 
 class Simulator:
     def __init__(self, config):
         self.cfg = config
         self.rng = np.random.default_rng(config.seed)
-        self.bets = build_bets(PAYTABLES)
+        self.bets = build_bets(PAYTABLES, config)
         self.accs = {b.name: Accumulator(2 * config.tc_cap + 1) for b in self.bets}
 
     def run(self):
@@ -27,23 +29,23 @@ class Simulator:
             self.accs[bet.name].add(idx, res, valid)
 
     @staticmethod
-    def rounds_per_shoe(n_cards, cut, cards_per_round):
-        """Rounds dealt per shoe: a round starts only if pos < cut and enough cards remain."""
+    def rounds_per_shoe(n_cards, cut, cards_per_round, cards_needed):
+        """Rounds dealt per shoe: a round starts only if pos < cut and cards_needed cards remain."""
         pos = np.arange(0, n_cards // cards_per_round + 1) * cards_per_round
-        return int(np.sum((pos < cut) & (n_cards - pos >= cards_per_round)))
+        return int(np.sum((pos < cut) & (n_cards - pos >= max(cards_per_round, cards_needed))))
 
     def _sample_fresh_hands(self, m):
-        """First 4 cards of m freshly shuffled shoes, drawn without replacement."""
+        """First CARDS_DEALT cards of m freshly shuffled shoes, drawn without replacement."""
         n = self.cfg.decks * 52
-        chosen = np.empty((m, 4), dtype=np.int64)
-        for j in range(4):
+        chosen = np.empty((m, CARDS_DEALT), dtype=np.int64)
+        for j in range(CARDS_DEALT):
             x = self.rng.integers(0, n - j, size=m)
+            prev = np.sort(chosen[:, :j], axis=1)
             for col in range(j):  # skip already-taken positions, ascending
-                prev = np.sort(chosen[:, :j], axis=1)[:, col]
-                x = x + (x >= prev)
+                x = x + (x >= prev[:, col])
             chosen[:, j] = x
         ids = (chosen % 52).astype(np.int8)
-        return [ids[:, j] for j in range(4)]
+        return [ids[:, j] for j in range(CARDS_DEALT)]
 
     def _run_fresh_shuffle(self):
         cfg = self.cfg
@@ -62,7 +64,7 @@ class Simulator:
         cpr = 4 + cfg.extra_cards
         cap = cfg.tc_cap
         cut = int(n_cards * cfg.penetration)
-        rps = self.rounds_per_shoe(n_cards, cut, cpr)
+        rps = self.rounds_per_shoe(n_cards, cut, cpr, CARDS_DEALT)
         if rps < 1:
             raise SystemExit("No rounds fit in a shoe with these settings.")
         base = np.arange(52, dtype=np.int8)
@@ -82,6 +84,6 @@ class Simulator:
             bucket = np.clip(np.rint(true_count), -cap, cap).astype(np.int64) + cap
 
             take = min(s * rps, remaining)
-            cards = [shoes[:, starts + j].reshape(-1)[:take] for j in range(4)]
+            cards = [shoes[:, starts + j].reshape(-1)[:take] for j in range(CARDS_DEALT)]
             self._tally(bucket.reshape(-1)[:take], cards)
             remaining -= take

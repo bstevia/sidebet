@@ -16,5 +16,6 @@ PAYTABLES = {
     },
     "royal_match": {"suited": 2.5, "royal": 25},
     "insurance": {"win": 2},
+    "dealer_bust": {3: 1, 4: 2, 5: 9, 6: 50, 7: 100, 8: 250},
 }
 
