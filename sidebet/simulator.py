@@ -1,7 +1,8 @@
 import numpy as np
 
 from .bets import build_bets
-from .cards import DEALER_MAX_HITS, HILO, Hands
+from .cards import DEALER_MAX_HITS, Hands
+from .counts import COUNT_SYSTEMS
 from .paytables import PAYTABLES
 from .stats import Accumulator
 
@@ -70,6 +71,12 @@ class Simulator:
         base = np.arange(52, dtype=np.int8)
         starts = np.arange(rps) * cpr
         rem_decks = (n_cards - starts) / 52.0
+        system = COUNT_SYSTEMS[cfg.count_system]
+        tags = system.int_tags
+        irc = system.initial_count(cfg.decks)
+        bound = abs(irc) + 4 * cfg.decks * max(tags[tags > 0].sum(), -tags[tags < 0].sum())
+        dtype = np.int16 if bound < np.iinfo(np.int16).max else np.int32
+        tags = tags.astype(dtype)
         shoes_per_batch = max(1, cfg.batch_cards // n_cards)
         remaining = cfg.rounds
 
@@ -77,11 +84,13 @@ class Simulator:
             s = min(shoes_per_batch, -(-remaining // rps))
             shoes = self.rng.permuted(np.tile(np.tile(base, cfg.decks), (s, 1)), axis=1)
 
-            # Running Hi-Lo count before each round = prefix sum at the round's start.
-            run = np.zeros((s, n_cards + 1), dtype=np.int16)
-            np.cumsum(HILO[shoes >> 2], axis=1, dtype=np.int16, out=run[:, 1:])
-            true_count = run[:, starts] / rem_decks
-            bucket = np.clip(np.rint(true_count), -cap, cap).astype(np.int64) + cap
+            # Running count before each round = prefix sum at the round's start.
+            run = np.zeros((s, n_cards + 1), dtype=dtype)
+            np.cumsum(tags[shoes >> 2], axis=1, dtype=dtype, out=run[:, 1:])
+            count = (run[:, starts] + irc) / system.scale
+            if system.balanced:
+                count = count / rem_decks  # true count
+            bucket = np.clip(np.rint(count), -cap, cap).astype(np.int64) + cap
 
             take = min(s * rps, remaining)
             cards = [shoes[:, starts + j].reshape(-1)[:take] for j in range(CARDS_DEALT)]

@@ -10,8 +10,6 @@ import numpy as np
 QUEEN, KING, ACE = 11, 12, 0
 HEARTS = 0
 
-# Hi-Lo: 2-6 => +1, 7-9 => 0, 10/J/Q/K/A => -1
-HILO = np.array([-1, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -1, -1], dtype=np.int16)
 # Blackjack values: A=11, 2-9 face value, 10/J/Q/K=10
 VALUE = np.array([11, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10], dtype=np.int8)
 # Same with A=1 (hard totals)
